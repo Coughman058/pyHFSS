@@ -206,6 +206,7 @@ class Bbq(object):
         for name, val in data.items():
             group[name] = val
 <<<<<<< HEAD
+<<<<<<< HEAD
    
     def get_Qseam(self, seam, mode, variation):
         '''
@@ -214,11 +215,6 @@ class Bbq(object):
         ref: http://arxiv.org/pdf/1509.01119.pdf
         '''
         lv = self.get_lv(variation)
-=======
-    
-    def get_Qseam(self, seam, mode):
-        # ref: http://arxiv.org/pdf/1509.01119.pdf
->>>>>>> n/a
         Qseam = {}
         print 'Calculating Qseam_'+ seam +' for mode ' + str(mode) + ' (' + str(mode) + '/' + str(self.nmodes-1) + ')'
         j_2_norm = self.fields.Vector_Jsurf.norm_2() # overestimating the loss by taking norm2 of j, rather than jperp**2
