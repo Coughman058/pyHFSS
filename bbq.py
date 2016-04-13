@@ -171,7 +171,6 @@ class Bbq(object):
         for name, val in data.items():
             group[name] = val
     
-    
     def get_Qseam(self, seam, mode):
         # ref: http://arxiv.org/pdf/1509.01119.pdf
         Qseam = {}
