@@ -5,8 +5,7 @@ Created on Fri Oct 30 14:21:45 2015
 @author: Zaki
 """
 
-root_dir = r'C:\Users\rslqulab\Desktop\zkm\2016_qm_jumps\DiTransmon_Asymetric\\'
-
+root_dir = r'D:\HFSS\pyHFSS_Examples\Analysis' # folder analyzed data
 # seams:
 # ref: http://arxiv.org/pdf/1509.01119.pdf
 gseam = 1.0e3 # per Ohm meter: seam conductance

@@ -699,7 +699,7 @@ class HfssEMDesignSolutions(HfssDesignSolutions):
     def set_mode(self, n, phase):
         n_modes = int(self.parent.n_modes)
         self._solutions.EditSources(
-            "TotalFields",
+            "EigenStoredEnergy",
             ["NAME:SourceNames", "EigenMode"],
             ["NAME:Modes", n_modes],
             ["NAME:Magnitudes"] + [1 if i + 1 == n else 0 for i in range(n_modes)],

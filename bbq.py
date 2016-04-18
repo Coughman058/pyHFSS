@@ -347,6 +347,7 @@ class Bbq(object):
         A=A.dot(B)
         A=A.real()
         A=A.integrate_vol(name=volume)
+        A=A.__mul__(0.5)
         return A.evaluate(lv=lv)
         
     def calc_U_H(self, variation, volume=None):
@@ -362,6 +363,7 @@ class Bbq(object):
         A=A.dot(B)
         A=A.real()
         A=A.integrate_vol(name=volume)
+        A=A.__mul__(0.5)
         return A.evaluate(lv=lv)
         
     def do_eBBQ(self, LJvariablename=None, variations=None, plot_fig=True, seams=None, dielectrics=None, surface=False, modes=None, calculate_H = None,
@@ -383,7 +385,7 @@ class Bbq(object):
 
                 Assumptions:
                     Low dissipation (high-Q). 
-                    Right now, we assume that there are no lumped capcitors to simply calculations. Not required. 
+                    Right now, we assume that there are no lumped capcitors to simplify calculations. Not required. 
                     We assume that there are only lumped inductors, so that U_tot = U_E+U_H+U_L    and U_C =0, so that U_tot = 2*U_E;
                 Results in:
                     self.PJ_multi_sol - a Pandas DataFrame of all the information
@@ -414,8 +416,7 @@ class Bbq(object):
             data['dielectrics'] = dielectrics
             
         
-        # A variation is a combination of project/design 
-        # variables in an optimetric sweep
+        # A variation is a combination of project/design variable values
         if variations is None:
             if self.listvariations == (u'',): # no optimetric sweep
                 variations = ['-1']
@@ -463,9 +464,10 @@ class Bbq(object):
                     self.fields = self.setup.get_fields()
                     self.omega = 2*np.pi*freqs_bare_vals[mode]
 
-                    print_NoNewLine('   U_H ...');     self.U_H = self.calc_U_H(variation)
-                    print_NoNewLine('   U_E');         self.U_E = self.calc_U_E(variation)
-                    print(  "   =>   U_L = %.3f%%" %( (self.U_E - self.U_H )/(2*self.U_E)) )
+                    print_NoNewLine('   U_H = ...'); self.U_H = self.calc_U_H(variation); print_NoNewLine(round(self.U_H,3))
+                    print_NoNewLine('   U_E = ...'); self.U_E = self.calc_U_E(variation); print_NoNewLine(round(self.U_E,3))
+                    print(  "   =>   U_L = %.3f%%    " %(100*(self.U_E - self.U_H )/(2*self.U_E)))
+                    print_NoNewLine(  "   =>   U_tot = %f" %((self.U_E + self.U_H )/2)); print_NoNewLine("<= THIS NUMBER SHOULD BE 1 !!!")
 
                     if self.calculate_H:  # Single-junction method 
                         lj = ureg.Quantity(data['_'+LJvariablename]).to_base_units().m                        
