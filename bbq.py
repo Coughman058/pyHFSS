@@ -221,6 +221,7 @@ class Bbq(object):
         group = self.h5file.create_group(variation)
         for name, val in data.items():
             group[name] = val
+
    
     def get_Qseam(self, seam, mode, variation):
         '''
