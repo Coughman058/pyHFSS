@@ -10,11 +10,11 @@ import signal
 import pythoncom
 import time
 from sympy.parsing import sympy_parser
-from pint import UnitRegistry
+from pint import UnitRegistry # units 
 from win32com.client import Dispatch, CDispatch
 
 ureg = UnitRegistry()
-Q = ureg.Quantity
+Q    = ureg.Quantity
 
 BASIS_ORDER = {"Zero Order": 0,
                "First Order": 1,
@@ -154,9 +154,11 @@ class HfssApp(COMWrapper):
     def __init__(self):
         super(HfssApp, self).__init__()
         self._app = Dispatch('AnsoftHfss.HfssScriptInterface')
-
+        # in v2016 the main object is 'Ansoft.ElectronicsDesktop'
+            
     def get_app_desktop(self):
         return HfssDesktop(self, self._app.GetAppDesktop())
+        # in v2016, there is also getApp - which can be called with HFSS
 
 class HfssDesktop(COMWrapper):
     def __init__(self, app, desktop):
@@ -190,6 +192,7 @@ class HfssDesktop(COMWrapper):
         return HfssProject(self, self._desktop.NewProject())
 
     def open_project(self, path):
+        ''' returns error if already open '''
         return HfssProject(self, self._desktop.OpenProject(path))
 
     def set_active_project(self, name):
@@ -229,7 +232,7 @@ class HfssProject(COMWrapper):
         super(HfssProject, self).__init__()
         self.parent = desktop
         self._project = project
-        self.name = project.GetName()
+        #self.name = project.GetName()
 
     def close(self):
         self._project.Close()
@@ -310,6 +313,10 @@ class HfssProject(COMWrapper):
 
     def new_em_design(self, name):
         return self.new_design(name, "Eigenmode")
+        
+    @property  # v2016
+    def name(self):
+        return self._project.GetName()
 
 
 class HfssDesign(COMWrapper):
@@ -414,21 +421,26 @@ class HfssDesign(COMWrapper):
     def get_nominal_variation(self):
         return self._design.GetNominalVariation()
 
-    def create_variable(self, name, value):
+    def create_variable(self, name, value, postprocessing=False):
+        if postprocessing==True:
+            variableprop = "PostProcessingVariableProp"
+        else:
+            variableprop = "VariableProp"
+            
         self._design.ChangeProperty(
             ["NAME:AllTabs",
              ["NAME:LocalVariableTab",
               ["NAME:PropServers", "LocalVariables"],
               ["Name:NewProps",
                ["NAME:" + name,
-                "PropType:=", "VariableProp",
+                "PropType:=", variableprop,
                 "UserDef:=", True,
                 "Value:=", value]]]])
 
-    def set_variable(self, name, value):
+    def set_variable(self, name, value, postprocessing=False):
         # TODO: check if variable does not exist and quit if it doesn't?
-        if name not in self._design.GetVariables():
-            self.create_variable(name, value)
+        if name not in self._design.GetVariables()+self._design.GetPostProcessingVariables():
+            self.create_variable(name, value, postprocessing=postprocessing)
         else:
             self._design.SetVariableValue(name, value)
         return VariableString(name)
@@ -437,17 +449,17 @@ class HfssDesign(COMWrapper):
         return self._design.GetVariableValue(name)
         
     def get_variable_names(self):
-        return [VariableString(s) for s in self._design.GetVariables()]        
+        return [VariableString(s) for s in self._design.GetVariables()+self._design.GetPostProcessingVariables()]        
         
     def get_variables(self):
-        local_variables = self._design.GetVariables()
+        local_variables = self._design.GetVariables()+self._design.GetPostProcessingVariables()
         return {lv : self.get_variable_value(lv) for lv in local_variables}
  
     def copy_design_variables(self, source_design):        
         ''' does not check that variables are all present '''
         
         # don't care about values
-        source_variables = source_design.get_variables() 
+        source_variables = source_design.get_variables()
         
         for name, value in source_variables.iteritems():
             self.set_variable(name, value)
@@ -472,6 +484,9 @@ class HfssDesign(COMWrapper):
     def eval_expr(self, expr, units="mm"):
         return str(self._evaluate_variable_expression(expr, units)) + units
 
+    def Clear_Field_Clac_Stack(self):
+        self._fields_calc.CalcStack("Clear")
+    
 class HfssSetup(HfssPropertyObject):
     prop_tab = "HfssTab"
     passes = make_int_prop("Passes")
@@ -595,6 +610,7 @@ class HfssSetup(HfssPropertyObject):
         return numpy.loadtxt(fn)
 
     def get_mesh_stats(self, variation=""):
+        #TODO: seems to be borken in 2016. todo fix
         fn = tempfile.mktemp()
         self.parent._design.ExportMeshStats(self.name, variation, fn, False)
         return numpy.loadtxt(fn)
@@ -663,22 +679,27 @@ class HfssDesignSolutions(COMWrapper):
         self._solutions = solutions
 
 class HfssEMDesignSolutions(HfssDesignSolutions):
-    def eigenmodes(self, variation=""):
+    def eigenmodes(self, lv=""):
         fn = tempfile.mktemp()
-        self._solutions.ExportEigenmodes(self.parent.solution_name, variation, fn)
+        self._solutions.ExportEigenmodes(self.parent.solution_name, lv, fn)
         data = numpy.loadtxt(fn, dtype='str')
-        if numpy.size(data[0,:])==6:
-            bws = [float(ii) for ii in data[:,3]]
+        if numpy.size(numpy.shape(data)) == 1: # getting around the very annoying fact that 
+            data = numpy.array([data])         # in Python a 1D array does not have shape (N,1)
+        else:                                  # but rather (N,) ....
+            pass
+        if numpy.size(data[0,:])==6: # checking if values for Q were saved
+            kappa_over_2pis = [2*float(ii) for ii in data[:,3]] # eigvalue=(omega-i*kappa/2)/2pi
+                                                    # so kappa/2pi = 2*Im(eigvalue)
         else:
-            bws = None
+            kappa_over_2pis = None
             
         freqs = [float(ii) for ii in data[:,1]]
-        return freqs, bws
+        return freqs, kappa_over_2pis
 
     def set_mode(self, n, phase):
         n_modes = int(self.parent.n_modes)
         self._solutions.EditSources(
-            "TotalFields",
+            "EigenStoredEnergy",
             ["NAME:SourceNames", "EigenMode"],
             ["NAME:Modes", n_modes],
             ["NAME:Magnitudes"] + [1 if i + 1 == n else 0 for i in range(n_modes)],
@@ -952,7 +973,7 @@ class ModelEntity(str, HfssPropertyObject):
         :type val: str
         :type modeler: HfssModeler
         """
-        super(ModelEntity, self).__init__(val)
+        super(ModelEntity, self).__init__()#val) #Comment out keyword to match arguments
         self.modeler = modeler
         self.prop_server = self + ":" + self.model_command + ":1"
 
@@ -1032,7 +1053,6 @@ class HfssFieldsCalc(COMWrapper):
     def clear_named_expressions(self):
         self.parent.parent._fields_calc.ClearAllNamedExpr()
 
-
 class CalcObject(COMWrapper):
     def __init__(self, stack, setup):
         """
@@ -1043,7 +1063,7 @@ class CalcObject(COMWrapper):
         self.stack = stack
         self.setup = setup
         self.calc_module = setup.parent._fields_calc
-
+        
     def _bin_op(self, other, op):
         if isinstance(other, (int, float)):
             other = ConstantCalcObject(other, self.setup)
@@ -1084,12 +1104,24 @@ class CalcObject(COMWrapper):
 
     def __pow__(self, other):
         return self._bin_op(other, "Pow")
+        
+    def dot(self, other):
+        return self._bin_op(other,"Dot")
 
     def __neg__(self):
         return self._unary_op("Neg")
 
     def __abs__(self):
         return self._unary_op("Abs")
+        
+    def __mag__(self):
+        return self._unary_op("Mag")
+    
+    def mag(self):
+        return self._unary_op("Mag")
+        
+    def conj(self):
+        return self._unary_op("Conj") # make this right
 
     def scalar_x(self):
         return self._unary_op("ScalarX")
@@ -1101,7 +1133,8 @@ class CalcObject(COMWrapper):
         return self._unary_op("ScalarZ")
 
     def norm_2(self):
-        return self._unary_op("ScalarX")**2+self._unary_op("ScalarY")**2+self._unary_op("ScalarZ")**2
+        return (self.__mag__()).__pow__(2)        
+        #return self._unary_op("ScalarX")**2+self._unary_op("ScalarY")**2+self._unary_op("ScalarZ")**2
 
     def real(self):
         return self._unary_op("Real")
@@ -1112,19 +1145,42 @@ class CalcObject(COMWrapper):
     def _integrate(self, name, type):
         stack = self.stack + [(type, name), ("CalcOp", "Integrate")]
         return CalcObject(stack, self.setup)
+      
+    def getQty(self, name):
+        stack = self.stack + [("EnterQty", name)]
+        return CalcObject(stack, self.setup)
 
     def integrate_line(self, name):
         return self._integrate(name, "EnterLine")
+        
+    def integrate_line_tangent(self, name): 
+        ''' integrate line tangent to vector expression \n
+            name = of line to integrate over '''
+        self.stack = self.stack + [("EnterLine", name),
+                                   ("CalcOp",    "Tangent"),
+                                   ("CalcOp",    "Dot")]
+        return self.integrate_line(name)
 
     def integrate_surf(self, name="AllObjects"):
         return self._integrate(name, "EnterSurf")
 
     def integrate_vol(self, name="AllObjects"):
         return self._integrate(name, "EnterVol")
+        
+    def times_eps(self):
+        stack = self.stack + [("ClcMaterial", ("Permittivity (epsi)", "mult"))]
+        return CalcObject(stack, self.setup)
+
+    def times_mu(self):
+        stack = self.stack + [("ClcMaterial", ("Permeability (mu)", "mult"))]
+        return CalcObject(stack, self.setup)
 
     def write_stack(self):
         for fn, arg in self.stack:
-            getattr(self.calc_module, fn)(arg)
+            if numpy.size(arg)>1:
+                getattr(self.calc_module, fn)(*arg)
+            else:
+                getattr(self.calc_module, fn)(arg)
 
     def save_as(self, name):
         """if the object already exists, try clearing your
@@ -1133,13 +1189,17 @@ class CalcObject(COMWrapper):
         self.calc_module.AddNamedExpr(name)
         return NamedCalcObject(name, self.setup)
 
-    def evaluate(self, phase=0, lv=None):#, n_mode=1):
+    def evaluate(self, phase=0, lv=None, print_debug = False):#, n_mode=1):
         self.write_stack()
+        if print_debug:
+            print '---------------------'
+            print 'writing to stack: OK'
+            print '-----------------'
         #self.calc_module.set_mode(n_mode, 0)
         setup_name = self.setup.solution_name
         
         if lv is not None:
-           args =lv
+           args = lv
         else:
            args = []
            
@@ -1158,13 +1218,24 @@ class NamedCalcObject(CalcObject):
         stack = [("CopyNamedExprToStack", name)]
         super(NamedCalcObject, self).__init__(stack, setup)
 
-
 class ConstantCalcObject(CalcObject):
     def __init__(self, num, setup):
         stack = [("EnterScalar", num)]
         super(ConstantCalcObject, self).__init__(stack, setup)
 
 def get_active_project():
+    ''' If you see the error:
+        "The requested operation requires elevation."
+        then you need to run your python as an admin.
+    '''
+    import ctypes, os
+    try:
+        is_admin = os.getuid() == 0
+    except AttributeError:
+        is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+    if not is_admin:
+        print '\033[93m WARNING: you are not runnning as an admin! You need to run as an admin. You will probably get an error next. \033[0m'
+    
     app = HfssApp()
     desktop = app.get_app_desktop()
     return desktop.get_active_project()
@@ -1177,4 +1248,21 @@ def get_report_arrays(name):
     d = get_active_design()
     r = HfssReport(d, name)
     return r.get_arrays()
+    
+def load_HFSS_project(proj_name, project_path, extension = '.aedt'):  #2016 version 
+    ''' proj_name == None => get active. 
+        (make sure 2 run as admin) '''
+    project_path +=  proj_name + extension
+    app     = HfssApp()
+    desktop = app.get_app_desktop()
+    if proj_name is not None:
+        if proj_name in desktop.get_project_names():
+            desktop.set_active_project(proj_name)    
+            project = desktop.get_active_project()
+        else:
+            project = desktop.open_project(project_path) 
+    else: 
+        project = desktop.get_active_project()
+    return app, desktop, project
+    
 
