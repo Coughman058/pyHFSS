@@ -1,3 +1,8 @@
+# 1. HFSS is open, your project is open, and your design is selected
+# 2. Optimetrics --> options --> save fields and and Mesh CHECKED
+# 3. In config_bbq, choose root_dir to save results of this calculation
+
+# import packages
 from hfss import get_active_project
 import bbq
 import matplotlib.pyplot as plt
@@ -5,12 +10,15 @@ import numpy as np
 from scipy.constants import *
 plt.close('all')
 
+# define project and design objects
 project = get_active_project()
-design = project.get_design("Design")
+design = project.get_active_design()
 
+# define bbq object: this creates the dataset, some attributes
 bbq_exp = bbq.Bbq(project, design, append_analysis=False, calculate_H=True)
 
-bbq_exp.do_bbq("LJ", surface=True, seams=["seam1"])
+# run the main method: do_bbq which returns all Hamiltonian parameters and Qs. 
+bbq_exp.do_bbq("$LJ", modes=[0,1], dielectrics=['Sapphire'], surface=True)
 
 #bbq_exp.bbq_analysis.plot_Hparams()
 

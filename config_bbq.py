@@ -13,11 +13,11 @@ gseam = 1.0e3 # per Ohm meter: seam conductance
 
 # surfaces:
 # ref: http://arxiv.org/pdf/1509.01854.pdf
-th = 3e-9 # dirt thickness on dielectric
-eps_r = 10 # dielectric constant of dirt
-tan_delta_surf = 1e-3 # tan(delta) for surfaces 
+th = 3.0e-9 # dirt thickness on dielectric
+eps_r = 10.0 # dielectric constant of dirt
+tan_delta_surf = 1.0e-3 # tan(delta) for surfaces 
 
 # bulk:
 # ref: http://arxiv.org/pdf/1509.01854.pdf
-tan_delta_sapp = 1e-6 # tan(delta) for bulk surface
-epsi = 10 # dielectric
+tan_delta_sapp = 1.0e-6 # tan(delta) for bulk surface
+epsi = 10.0 # dielectric

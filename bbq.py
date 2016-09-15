@@ -348,6 +348,8 @@ class Bbq(object):
     def do_bbq(self, LJvariablename, variations=None, plot_fig=True, seams=None, dielectrics=None, surface=False, modes=None):
         # seams = ['seam1', 'seam2']  (seams needs to be a list of strings)
         # variations = ['0', '1']
+        # modes = [0,1]
+        
         if self.latest_h5_path is not None and self.append_analysis:
             shutil.copyfile(self.latest_h5_path, self.data_filename)
         

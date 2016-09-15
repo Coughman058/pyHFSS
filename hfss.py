@@ -229,7 +229,7 @@ class HfssProject(COMWrapper):
         super(HfssProject, self).__init__()
         self.parent = desktop
         self._project = project
-        #self.name = project.GetName()
+        self.name = project.GetName()
 
     def close(self):
         self._project.Close()
@@ -310,7 +310,6 @@ class HfssProject(COMWrapper):
 
     def new_em_design(self, name):
         return self.new_design(name, "Eigenmode")
-
 
 class HfssDesign(COMWrapper):
     def __init__(self, project, design):
